@@ -8,8 +8,9 @@ use starknet_rust_core::types::{
     MaybePreConfirmedBlockWithTxHashes, MaybePreConfirmedBlockWithTxs,
     MaybePreConfirmedStateUpdate, MessageFeeEstimate, MessageStatus, MsgFromL1,
     SimulateTransactionsResult, SimulationFlag, SimulationFlagForEstimateFee, StorageProof,
-    SyncStatusType, TraceBlockTransactionsResult, TraceFlag, Transaction,
-    TransactionReceiptWithBlockInfo, TransactionResponseFlag, TransactionStatus, TransactionTrace,
+    StorageResponseFlag, StorageResult, SyncStatusType, TraceBlockTransactionsResult, TraceFlag,
+    Transaction, TransactionReceiptWithBlockInfo, TransactionResponseFlag, TransactionStatus,
+    TransactionTrace,
 };
 
 use crate::{
@@ -180,6 +181,43 @@ impl Provider for AnyProvider {
                     contract_address,
                     key,
                     block_id,
+                )
+                .await
+            }
+        }
+    }
+
+    async fn get_storage_at_with_flags<A, K, B, F>(
+        &self,
+        contract_address: A,
+        key: K,
+        block_id: B,
+        flags: F,
+    ) -> Result<StorageResult, ProviderError>
+    where
+        A: AsRef<Felt> + Send + Sync,
+        K: AsRef<Felt> + Send + Sync,
+        B: AsRef<BlockId> + Send + Sync,
+        F: AsRef<[StorageResponseFlag]> + Send + Sync,
+    {
+        match self {
+            Self::JsonRpcHttp(inner) => {
+                <JsonRpcClient<HttpTransport> as Provider>::get_storage_at_with_flags(
+                    inner,
+                    contract_address,
+                    key,
+                    block_id,
+                    flags,
+                )
+                .await
+            }
+            Self::SequencerGateway(inner) => {
+                <SequencerGatewayProvider as Provider>::get_storage_at_with_flags(
+                    inner,
+                    contract_address,
+                    key,
+                    block_id,
+                    flags,
                 )
                 .await
             }

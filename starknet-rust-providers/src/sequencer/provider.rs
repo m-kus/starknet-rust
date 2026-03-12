@@ -12,8 +12,9 @@ use starknet_rust_core::types::{
     MaybePreConfirmedBlockWithTxHashes, MaybePreConfirmedBlockWithTxs,
     MaybePreConfirmedStateUpdate, MessageFeeEstimate, MessageStatus, MsgFromL1,
     SimulateTransactionsResult, SimulationFlag, SimulationFlagForEstimateFee, StarknetError,
-    StorageProof, SyncStatusType, TraceBlockTransactionsResult, TraceFlag, Transaction,
-    TransactionReceiptWithBlockInfo, TransactionResponseFlag, TransactionStatus, TransactionTrace,
+    StorageProof, StorageResponseFlag, StorageResult, SyncStatusType,
+    TraceBlockTransactionsResult, TraceFlag, Transaction, TransactionReceiptWithBlockInfo,
+    TransactionResponseFlag, TransactionStatus, TransactionTrace,
 };
 
 use crate::{
@@ -109,6 +110,24 @@ impl Provider for SequencerGatewayProvider {
         B: AsRef<BlockId> + Send + Sync,
     {
         // Deprecated since Starknet v0.12.3
+        Err(ProviderError::Other(Box::new(
+            GatewayClientError::MethodNotSupported,
+        )))
+    }
+
+    async fn get_storage_at_with_flags<A, K, B, F>(
+        &self,
+        _contract_address: A,
+        _key: K,
+        _block_id: B,
+        _flags: F,
+    ) -> Result<StorageResult, ProviderError>
+    where
+        A: AsRef<Felt> + Send + Sync,
+        K: AsRef<Felt> + Send + Sync,
+        B: AsRef<BlockId> + Send + Sync,
+        F: AsRef<[StorageResponseFlag]> + Send + Sync,
+    {
         Err(ProviderError::Other(Box::new(
             GatewayClientError::MethodNotSupported,
         )))

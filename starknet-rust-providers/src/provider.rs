@@ -10,9 +10,9 @@ use starknet_rust_core::types::{
     MaybePreConfirmedBlockWithTxHashes, MaybePreConfirmedBlockWithTxs,
     MaybePreConfirmedStateUpdate, MessageFeeEstimate, MessageStatus, MsgFromL1,
     SimulateTransactionsResult, SimulatedTransaction, SimulationFlag, SimulationFlagForEstimateFee,
-    StarknetError, StorageProof, SubscriptionId, SyncStatusType, TraceBlockTransactionsResult,
-    TraceFlag, Transaction, TransactionReceiptWithBlockInfo, TransactionResponseFlag,
-    TransactionStatus, TransactionTrace,
+    StarknetError, StorageProof, StorageResponseFlag, StorageResult, SubscriptionId,
+    SyncStatusType, TraceBlockTransactionsResult, TraceFlag, Transaction,
+    TransactionReceiptWithBlockInfo, TransactionResponseFlag, TransactionStatus, TransactionTrace,
     requests::{
         AddDeclareTransactionRequest, AddDeployAccountTransactionRequest,
         AddInvokeTransactionRequest, BlockHashAndNumberRequest, BlockNumberRequest, CallRequest,
@@ -100,6 +100,20 @@ pub trait Provider {
         A: AsRef<Felt> + Send + Sync,
         K: AsRef<Felt> + Send + Sync,
         B: AsRef<BlockId> + Send + Sync;
+
+    /// Gets the value of the storage at the given address and key, with additional response flags.
+    async fn get_storage_at_with_flags<A, K, B, F>(
+        &self,
+        contract_address: A,
+        key: K,
+        block_id: B,
+        flags: F,
+    ) -> Result<StorageResult, ProviderError>
+    where
+        A: AsRef<Felt> + Send + Sync,
+        K: AsRef<Felt> + Send + Sync,
+        B: AsRef<BlockId> + Send + Sync,
+        F: AsRef<[StorageResponseFlag]> + Send + Sync;
 
     /// Given an l1 tx hash, returns the associated `l1_handler` tx hashes and statuses for all L1 ->
     /// L2 messages sent by the l1 transaction, ordered by the l1 tx sending order
@@ -519,6 +533,8 @@ pub enum ProviderResponseData {
     GetStateUpdate(MaybePreConfirmedStateUpdate),
     /// Response data for `starknet_getStorageAt`.
     GetStorageAt(Felt),
+    /// Response data for `starknet_getStorageAt` with response flags.
+    GetStorageAtWithFlags(StorageResult),
     /// Response data for `starknet_getMessagesStatus`.
     GetMessagesStatus(Vec<MessageStatus>),
     /// Response data for `starknet_getTransactionStatus`.

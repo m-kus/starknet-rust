@@ -51,7 +51,7 @@ pub use codegen::{
     ResourceBoundsMapping, ResourcePrice, ResultPageRequest, RevertedInvocation,
     SequencerTransactionStatus, SierraEntryPoint, SimulatedTransaction, SimulationFlag,
     SimulationFlagForEstimateFee, StarknetError, StateDiff, StateUpdate, StorageEntry, StorageKey,
-    StorageProof, SubscriptionId, SubscriptionTag, SyncStatus, TraceFlag,
+    StorageProof, StorageResponseFlag, StorageResult, SubscriptionId, SubscriptionTag, SyncStatus, TraceFlag,
     TransactionExecutionErrorData, TransactionExecutionStatus, TransactionFinalityStatus,
     TransactionReceiptWithBlockInfo, TransactionResponseFlag, TransactionTraceWithHash,
     TransactionWithL2Status, TransactionWithReceipt,
@@ -1305,6 +1305,77 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_storage_response_flag_serde() {
+        let flag = StorageResponseFlag::IncludeLastUpdateBlock;
+        let json = serde_json::to_string(&flag).unwrap();
+        assert_eq!(json, r#""INCLUDE_LAST_UPDATE_BLOCK""#);
+        let parsed: StorageResponseFlag = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, flag);
+    }
+
+    #[test]
+    fn test_storage_result_deser() {
+        let json = r#"{"value":"0x1e240","last_update_block":42}"#;
+        let result: StorageResult = serde_json::from_str(json).unwrap();
+        assert_eq!(result.value, Felt::from_dec_str("123456").unwrap());
+        assert_eq!(result.last_update_block, 42);
+
+        // Round-trip
+        let serialized = serde_json::to_string(&result).unwrap();
+        let reparsed: StorageResult = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(reparsed, result);
+    }
+
+    #[test]
+    fn test_parse_get_storage_at_request_without_flags() {
+        let as_object =
+            r#"{"contract_address":"0x123","key":"0x456","block_id":{"block_number":200}}"#;
+        let as_array = r#"["0x123","0x456",{"block_number":200}]"#;
+
+        let from_object: GetStorageAtRequest = serde_json::from_str(as_object).unwrap();
+        assert!(from_object.response_flags.is_none());
+
+        let from_array: GetStorageAtRequest = serde_json::from_str(as_array).unwrap();
+        assert!(from_array.response_flags.is_none());
+    }
+
+    #[test]
+    fn test_parse_get_storage_at_request_with_flags() {
+        let as_object = r#"{"contract_address":"0x123","key":"0x456","block_id":{"block_number":200},"response_flags":["INCLUDE_LAST_UPDATE_BLOCK"]}"#;
+
+        let parsed: GetStorageAtRequest = serde_json::from_str(as_object).unwrap();
+        assert_eq!(
+            parsed.response_flags,
+            Some(vec![StorageResponseFlag::IncludeLastUpdateBlock])
+        );
+    }
+
+    #[test]
+    fn test_get_storage_at_request_serialization_skips_none_flags() {
+        let req = GetStorageAtRequest {
+            contract_address: Felt::from_hex_unchecked("0x123"),
+            key: StorageKey(String::from("0x456")),
+            block_id: BlockId::Number(200),
+            response_flags: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("response_flags"));
+    }
+
+    #[test]
+    fn test_get_storage_at_request_serialization_includes_flags() {
+        let req = GetStorageAtRequest {
+            contract_address: Felt::from_hex_unchecked("0x123"),
+            key: StorageKey(String::from("0x456")),
+            block_id: BlockId::Number(200),
+            response_flags: Some(vec![StorageResponseFlag::IncludeLastUpdateBlock]),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("response_flags"));
+        assert!(json.contains("INCLUDE_LAST_UPDATE_BLOCK"));
     }
 
     #[test]

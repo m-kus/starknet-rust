@@ -2439,6 +2439,23 @@ pub struct StorageProof {
     pub global_roots: GlobalRoots,
 }
 
+/// Flags that control what additional fields are included in storage responses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StorageResponseFlag {
+    #[serde(rename = "INCLUDE_LAST_UPDATE_BLOCK")]
+    IncludeLastUpdateBlock,
+}
+
+/// The result of a storage query with response flags.
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "no_unknown_fields", serde(deny_unknown_fields))]
+pub struct StorageResult {
+    #[serde_as(as = "UfeHex")]
+    pub value: Felt,
+    pub last_update_block: u64,
+}
+
 /// Subscription id.
 ///
 /// An identifier for this subscription stream used to associate events with this subscription.
@@ -2855,6 +2872,8 @@ pub struct GetStorageAtRequest {
     pub key: StorageKey,
     /// The hash of the requested block, or number (height) of the requested block, or a block tag
     pub block_id: BlockId,
+    /// Flags that control what additional fields are included in the response
+    pub response_flags: Option<Vec<StorageResponseFlag>>,
 }
 
 /// Reference version of [GetStorageAtRequest].
@@ -2863,6 +2882,7 @@ pub struct GetStorageAtRequestRef<'a> {
     pub contract_address: &'a Felt,
     pub key: &'a StorageKey,
     pub block_id: &'a BlockId,
+    pub response_flags: Option<&'a [StorageResponseFlag]>,
 }
 
 /// Request for method starknet_getStorageProof
@@ -8184,6 +8204,8 @@ impl Serialize for GetStorageAtRequest {
             contract_address: Field0<'a>,
             key: Field1<'a>,
             block_id: Field2<'a>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            response_flags: Option<Field3<'a>>,
         }
 
         #[serde_as]
@@ -8206,6 +8228,12 @@ impl Serialize for GetStorageAtRequest {
             pub value: &'a BlockId,
         }
 
+        #[derive(Serialize)]
+        #[serde(transparent)]
+        struct Field3<'a> {
+            pub value: &'a [StorageResponseFlag],
+        }
+
         AsObject::serialize(
             &AsObject {
                 contract_address: Field0 {
@@ -8215,6 +8243,7 @@ impl Serialize for GetStorageAtRequest {
                 block_id: Field2 {
                     value: &self.block_id,
                 },
+                response_flags: self.response_flags.as_deref().map(|f| Field3 { value: f }),
             },
             serializer,
         )
@@ -8228,6 +8257,8 @@ impl Serialize for GetStorageAtRequestRef<'_> {
             contract_address: Field0<'a>,
             key: Field1<'a>,
             block_id: Field2<'a>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            response_flags: Option<Field3<'a>>,
         }
 
         #[serde_as]
@@ -8250,6 +8281,12 @@ impl Serialize for GetStorageAtRequestRef<'_> {
             pub value: &'a BlockId,
         }
 
+        #[derive(Serialize)]
+        #[serde(transparent)]
+        struct Field3<'a> {
+            pub value: &'a [StorageResponseFlag],
+        }
+
         AsObject::serialize(
             &AsObject {
                 contract_address: Field0 {
@@ -8259,6 +8296,7 @@ impl Serialize for GetStorageAtRequestRef<'_> {
                 block_id: Field2 {
                     value: self.block_id,
                 },
+                response_flags: self.response_flags.map(|f| Field3 { value: f }),
             },
             serializer,
         )
@@ -8272,6 +8310,8 @@ impl<'de> Deserialize<'de> for GetStorageAtRequest {
             contract_address: Field0,
             key: Field1,
             block_id: Field2,
+            #[serde(default)]
+            response_flags: Option<Field3>,
         }
 
         #[serde_as]
@@ -8292,6 +8332,12 @@ impl<'de> Deserialize<'de> for GetStorageAtRequest {
         #[serde(transparent)]
         struct Field2 {
             pub value: BlockId,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(transparent)]
+        struct Field3 {
+            pub value: Vec<StorageResponseFlag>,
         }
 
         let temp = serde_json::Value::deserialize(deserializer)?;
@@ -8320,12 +8366,14 @@ impl<'de> Deserialize<'de> for GetStorageAtRequest {
                 contract_address: field0.value,
                 key: field1.value,
                 block_id: field2.value,
+                response_flags: None,
             })
         } else if let Ok(object) = AsObject::deserialize(&temp) {
             Ok(Self {
                 contract_address: object.contract_address.value,
                 key: object.key.value,
                 block_id: object.block_id.value,
+                response_flags: object.response_flags.map(|f| f.value),
             })
         } else {
             Err(serde::de::Error::custom("invalid sequence length"))

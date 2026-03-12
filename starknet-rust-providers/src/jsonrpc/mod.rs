@@ -18,7 +18,7 @@ use starknet_rust_core::{
         SimulationFlagForEstimateFee, StarknetError, StorageKey, StorageProof, SubscriptionId,
         SyncStatusType, TraceBlockTransactionsResult, TraceFlag, Transaction,
         TransactionExecutionErrorData, TransactionReceiptWithBlockInfo, TransactionResponseFlag,
-        TransactionStatus, TransactionTrace,
+        TransactionStatus, TransactionTrace, StorageResponseFlag, StorageResult,
         requests::{
             AddDeclareTransactionRequest, AddDeclareTransactionRequestRef,
             AddDeployAccountTransactionRequest, AddDeployAccountTransactionRequestRef,
@@ -373,6 +373,14 @@ where
                                     .map_err(JsonRpcClientError::<T::Error>::JsonError)?,
                             )
                         }
+                        ProviderRequestData::GetStorageAt(req)
+                            if req.response_flags.is_some() =>
+                        {
+                            ProviderResponseData::GetStorageAtWithFlags(
+                                StorageResult::deserialize(result)
+                                    .map_err(JsonRpcClientError::<T::Error>::JsonError)?,
+                            )
+                        }
                         ProviderRequestData::GetStorageAt(_) => ProviderResponseData::GetStorageAt(
                             Felt::deserialize(result)
                                 .map_err(JsonRpcClientError::<T::Error>::JsonError)?
@@ -681,10 +689,36 @@ where
                     contract_address: contract_address.as_ref(),
                     key: &StorageKey(format!("{:#x}", key.as_ref())),
                     block_id: block_id.as_ref(),
+                    response_flags: None,
                 },
             )
             .await?
             .0)
+    }
+
+    async fn get_storage_at_with_flags<A, K, B, F>(
+        &self,
+        contract_address: A,
+        key: K,
+        block_id: B,
+        flags: F,
+    ) -> Result<StorageResult, ProviderError>
+    where
+        A: AsRef<FeltPrimitive> + Send + Sync,
+        K: AsRef<FeltPrimitive> + Send + Sync,
+        B: AsRef<BlockId> + Send + Sync,
+        F: AsRef<[StorageResponseFlag]> + Send + Sync,
+    {
+        self.send_request(
+            JsonRpcMethod::GetStorageAt,
+            GetStorageAtRequestRef {
+                contract_address: contract_address.as_ref(),
+                key: &StorageKey(format!("{:#x}", key.as_ref())),
+                block_id: block_id.as_ref(),
+                response_flags: Some(flags.as_ref()),
+            },
+        )
+        .await
     }
 
     /// Given an l1 tx hash, returns the associated `l1_handler` tx hashes and statuses for all L1 ->

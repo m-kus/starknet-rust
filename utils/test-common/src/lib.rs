@@ -17,7 +17,9 @@ const DEFAULT_RETRY_TIMEOUT: Duration = Duration::new(120, 0);
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 pub fn create_jsonrpc_client() -> JsonRpcClient<HttpTransport> {
-    let url = url::Url::parse("http://188.34.188.184:7070/rpc/v0_10").unwrap();
+    let url = std::env::var("TEST_NODE_URL")
+        .unwrap_or_else(|_| "http://188.34.188.184:7070/rpc/v0_10".to_string());
+    let url = url::Url::parse(&url).unwrap();
     JsonRpcClient::new(HttpTransport::new(url))
 }
 
